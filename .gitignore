@@ -1,0 +1,9 @@
+config.json
+state.json
+state.json.tmp
+config.json.tmp
+log.txt
+.lock
+HANDOFF.md
+__pycache__/
+.DS_Store

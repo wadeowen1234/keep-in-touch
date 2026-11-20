@@ -1,0 +1,15 @@
+{
+  "ntfy_server": "https://ntfy.sh",
+  "ntfy_topic": "REPLACE_WITH_YOUR_TOPIC",
+  "notify_hour": 11,
+  "awake_hours": [9, 22],
+  "nudge_after_days": 2,
+  "nudge_repeat_days": 2,
+  "snooze_days": 3,
+  "count_their_texts": false,
+  "mac_banners": true,
+  "people": [
+    { "name": "Dad", "handles": ["+18475550101"], "every_days": 4, "nudges": true },
+    { "name": "Sam", "handles": ["+13125550103", "sam@icloud.com"], "every_days": 30, "nudges": true }
+  ]
+}

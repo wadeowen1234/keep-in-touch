@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keep in Touch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one centered column. Status strip, then people sorted by who's due, then add-someone, then settings. */
+:root {
+  --bg: #eef2f1; --surface: #ffffff; --ink: #15211f; --muted: #5b6b68; --line: #d6dfdd;
+  --accent: #0f7b6c; --accent-ink: #ffffff; --accent-soft: #dcefeb;
+  --due: #b86e00; --due-bg: #fff3dd; --late: #c0392b; --late-bg: #fde8e5; --ok: #2d7a46; --ok-bg: #e4f3e9;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1615; --surface: #18221f; --ink: #e6efec; --muted: #93a6a1; --line: #2a3734;
+    --accent: #3fbfa8; --accent-ink: #062621; --accent-soft: #173a34;
+    --due: #f0b14a; --due-bg: #3a2c12; --late: #ff8a7a; --late-bg: #3d1d19; --ok: #7fd49a; --ok-bg: #18311f;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 640px; margin: 0 auto; padding: 28px 16px 64px; display: grid; gap: 22px; }
+h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: 30px; letter-spacing: -0.01em; }
+h2 { font-size: 18px; }
+.sub { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+.strip { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 14px; color: var(--muted); }
+.strip b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.list { display: grid; gap: 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 12px; }
+.card.ok { border-left-color: var(--ok); } .card.due { border-left-color: var(--due); } .card.late { border-left-color: var(--late); }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.name { font-weight: 600; font-size: 16px; }
+.meta { color: var(--muted); font-size: 13px; }
+.pill { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); } .pill.due { background: var(--due-bg); color: var(--due); }
+.pill.late { background: var(--late-bg); color: var(--late); } .pill.muted { background: var(--bg); color: var(--muted); }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.controls .spacer { flex: 1; }
+input.days { width: 76px; text-align: center; font-variant-numeric: tabular-nums; }
+.inline-text { font-size: 14px; color: var(--muted); }
+label.inline { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+button { font: 500 14px var(--body); border-radius: 10px; padding: 8px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.ghost { border-color: transparent; color: var(--muted); }
+button:disabled { opacity: .5; cursor: default; }
+input, select { font: 14px var(--body); padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
+input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); padding: 0; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border-radius: 999px; padding: 6px 12px; background: var(--accent-soft); border: 1px solid transparent; font-size: 13px; }
+.chip small { color: var(--muted); margin-left: 4px; }
+.results { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
+.result { text-align: left; display: flex; justify-content: space-between; gap: 10px; border-color: transparent; }
+.result:hover { background: var(--accent-soft); }
+.result small { color: var(--muted); }
+.picked { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row input[type=text] { flex: 1 1 180px; }
+.edit { display: grid; gap: 8px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.hint { font-size: 13px; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 18px; }
+.grid2 label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+details.panel summary { cursor: pointer; font-family: var(--display); font-weight: 600; font-size: 18px; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; max-width: calc(100% - 32px); opacity: 0; pointer-events: none; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+.toast.err { background: var(--late); color: #fff; }
+.empty { color: var(--muted); text-align: center; padding: 18px; border: 1px dashed var(--line); border-radius: 14px; }
+code { font-size: 13px; background: var(--bg); padding: 2px 6px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Keep in Touch</h1>
+    <p class="sub">Who you're keeping up with, how often, and who's due. Changes take effect right away.</p>
+  </header>
+
+  <div class="strip" id="strip"><span>Loading…</span></div>
+
+  <section class="list" id="list" aria-label="Your people"></section>
+
+  <section class="panel" aria-labelledby="addTitle">
+    <h2 id="addTitle">Add someone</h2>
+    <div id="frequentWrap" hidden>
+      <div class="hint" style="margin-bottom:8px">People you've texted most in the last 90 days</div>
+      <div class="chips" id="frequent"></div>
+    </div>
+    <div>
+      <input id="search" type="text" placeholder="Search your contacts" autocomplete="off" style="width:100%">
+      <div class="results" id="results"></div>
+    </div>
+    <div class="picked" id="picked">
+      <div class="row">
+        <input id="newName" type="text" placeholder="Name">
+        <input id="newHandle" type="text" placeholder="Phone or iMessage email">
+      </div>
+      <div class="row">
+        <label class="inline" for="newEvery">Text every</label>
+        <input id="newEvery" class="days" type="number" min="1" max="365" inputmode="numeric" value="14"><span class="inline-text">days</span>
+        <label class="inline"><input id="newNudges" type="checkbox" checked> Nudges</label>
+        <span class="spacer" style="flex:1"></span>
+        <button class="primary" id="addBtn" type="button">Add</button>
+      </div>
+    </div>
+  </section>
+
+  <details class="panel">
+    <summary>Settings</summary>
+    <div class="grid2">
+      <label>Reminder time<select id="s_notify_hour"></select></label>
+      <label>First nudge after<select id="s_nudge_after_days"></select></label>
+      <label>Then nudge every<select id="s_nudge_repeat_days"></select></label>
+      <label>Snooze button length<select id="s_snooze_days"></select></label>
+      <label>Catch-up banners only between<span class="row"><select id="s_awake_0"></select> and <select id="s_awake_1"></select></span></label>
+      <div style="display:grid;gap:8px;align-content:start">
+        <label class="inline"><input id="s_count_their_texts" type="checkbox"> Their texts reset the timer too</label>
+        <label class="inline"><input id="s_mac_banners" type="checkbox"> Show banners on this Mac</label>
+      </div>
+    </div>
+    <div class="row">
+      <button class="primary" id="saveSettings" type="button">Save settings</button>
+      <button id="testBtn" type="button">Send test banner</button>
+    </div>
+    <p class="hint" id="topicHint"></p>
+  </details>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+let data = null, contacts = [], frequent = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+function toast(msg, err) {
+  const t = $("toast"); t.textContent = msg; t.className = "toast show" + (err ? " err" : "");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.className = "toast", 3200);
+}
+
+async function api(path, body) {
+  const opts = body ? { method: "POST", headers: { "Content-Type": "application/json", "X-Kit": "1" }, body: JSON.stringify(body) } : {};
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({ error: "Something went wrong." }));
+  if (!r.ok) throw new Error(j.error || "Something went wrong.");
+  return j;
+}
+
+async function act(path, body) {
+  try {
+    const j = await api(path, body);
+    if (j.overview) { data = j.overview; render(); }
+    if (j.message) toast(j.message);
+    return true;
+  } catch (e) { toast(e.message, true); return false; }
+}
+
+function statusOf(p) {
+  if (p.last_days_ago === null) return { cls: "muted", label: "No texts found", rank: 1 };
+  if (p.snoozed_until) return { cls: "muted", label: "Snoozed", rank: 50 };
+  if (p.due_in < 0) return { cls: "late", label: plural(-p.due_in, "day") + " overdue", rank: 0 };
+  if (p.due_in === 0) return { cls: "due", label: "Due today", rank: 0.5 };
+  return { cls: "ok", label: p.due_in === 1 ? "Due tomorrow" : `Due in ${p.due_in} days`, rank: 2 + p.due_in };
+}
+
+function lastText(p) {
+  if (p.last_days_ago === null) return "Check this number matches Messages";
+  if (p.last_days_ago === 0) return "Texted today";
+  return p.last_days_ago === 1 ? "Texted yesterday" : `Texted ${p.last_days_ago} days ago`;
+}
+
+function render() {
+  if (!data) return;
+  const due = data.people.filter(p => p.due_in <= 0 && !p.snoozed_until && p.last_days_ago !== null).length;
+  const mins = data.last_run ? Math.max(0, Math.round((data.now - data.last_run) / 60)) : null;
+  $("strip").innerHTML = `<span><b>${data.people.length}</b> people · <b>${due}</b> due now · <b>${data.queued}</b> banner${data.queued === 1 ? "" : "s"} queued</span>
+    <span>${mins === null ? "Not checked yet" : mins === 0 ? "Checked just now" : "Checked " + plural(mins, "min") + " ago"}</span>`;
+
+  const list = $("list");
+  if (!data.people.length) { list.innerHTML = `<p class="empty">No one yet. Pick someone below to get started.</p>`; }
+  else list.innerHTML = "";
+  data.people.map(p => ({ p, s: statusOf(p) })).sort((a, b) => a.s.rank - b.s.rank).forEach(({ p, s }, i) => {
+    const c = document.createElement("article");
+    c.className = `card ${s.cls}`;
+    c.innerHTML = `
+      <div class="top">
+        <div><div class="name">${esc(p.name)}</div><div class="meta">${esc(lastText(p))}${p.snoozed_until ? " · back on " + esc(p.snoozed_until) : ""}</div></div>
+        <span class="pill ${s.cls}">${esc(s.label)}</span>
+      </div>
+      <div class="controls">
+        <label class="inline" for="ev${i}">Every</label><input id="ev${i}" class="days" type="number" min="1" max="365" inputmode="numeric" value="${p.every_days}" data-k="every"><span class="inline-text">days</span>
+        <label class="inline"><input type="checkbox" data-k="nudges" ${p.nudges ? "checked" : ""}> Nudges</label>
+        <span class="spacer"></span>
+        <button type="button" data-k="talked" title="Use this for calls or seeing them in person">Talked ✓</button>
+        <button type="button" data-k="snooze">Snooze ${data.settings.snooze_days}d</button>
+        <button type="button" class="ghost" data-k="edit" aria-expanded="false">Edit</button>
+      </div>
+      <div class="edit" hidden>
+        <div class="row">
+          <input type="text" data-k="ename" value="${esc(p.name)}" aria-label="Name">
+          <input type="text" data-k="ehandles" value="${esc(p.handles.join(", "))}" aria-label="Numbers or emails, comma separated">
+        </div>
+        <div class="row">
+          <span class="hint">Separate multiple numbers or emails with commas.</span>
+          <span class="spacer" style="flex:1"></span>
+          <button type="button" class="ghost" data-k="remove">Remove</button>
+          <button type="button" class="primary" data-k="save">Save</button>
+        </div>
+      </div>`;
+    const person = extra => Object.assign({ original: p.name, name: p.name, handles: p.handles, every_days: p.every_days, nudges: p.nudges }, extra);
+    c.querySelector('[data-k="every"]').onchange = e => { const v = Math.round(+e.target.value); if (v >= 1 && v <= 365) act("/api/person", person({ every_days: v })); else { toast("Pick a number from 1 to 365.", true); e.target.value = p.every_days; } };
+    c.querySelector('[data-k="nudges"]').onchange = e => act("/api/action", { cmd: e.target.checked ? "nudges-on" : "nudges-off", name: p.name });
+    c.querySelector('[data-k="talked"]').onclick = () => act("/api/action", { cmd: "talked", name: p.name });
+    c.querySelector('[data-k="snooze"]').onclick = () => act("/api/action", { cmd: "snooze", name: p.name });
+    const editBtn = c.querySelector('[data-k="edit"]'), edit = c.querySelector(".edit");
+    editBtn.onclick = () => { edit.hidden = !edit.hidden; editBtn.setAttribute("aria-expanded", String(!edit.hidden)); };
+    c.querySelector('[data-k="save"]').onclick = () => act("/api/person", person({
+      name: c.querySelector('[data-k="ename"]').value,
+      handles: c.querySelector('[data-k="ehandles"]').value.split(",").map(s => s.trim()).filter(Boolean)
+    }));
+    c.querySelector('[data-k="remove"]').onclick = () => act("/api/remove", { name: p.name });
+    list.appendChild(c);
+  });
+
+  renderFrequent();
+  const st = data.settings;
+  hourOptions($("s_notify_hour"), st.notify_hour, 6, 22);
+  dayOptions($("s_nudge_after_days"), st.nudge_after_days);
+  dayOptions($("s_nudge_repeat_days"), st.nudge_repeat_days);
+  dayOptions($("s_snooze_days"), st.snooze_days);
+  hourOptions($("s_awake_0"), st.awake_hours[0], 0, 23);
+  hourOptions($("s_awake_1"), st.awake_hours[1], 1, 24);
+  $("s_count_their_texts").checked = st.count_their_texts;
+  $("s_mac_banners").checked = st.mac_banners;
+  $("topicHint").innerHTML = `Your phone should be subscribed to <code>${esc(data.topic)}</code> in the ntfy app.`;
+}
+
+function hourLabel(h) { return h === 0 || h === 24 ? "12 am" : h === 12 ? "12 pm" : h < 12 ? h + " am" : (h - 12) + " pm"; }
+function hourOptions(sel, cur, from, to) {
+  if (document.activeElement === sel) return;
+  let o = ""; for (let h = from; h <= to; h++) o += `<option value="${h}"${h === cur ? " selected" : ""}>${hourLabel(h)}</option>`;
+  sel.innerHTML = o;
+}
+function dayOptions(sel, cur) {
+  if (document.activeElement === sel) return;
+  let o = ""; for (const d of [1, 2, 3, 4, 5, 7, 10, 14]) o += `<option value="${d}"${d === cur ? " selected" : ""}>${plural(d, "day")}</option>`;
+  sel.innerHTML = o;
+}
+
+function taken() { return new Set(data ? data.people.flatMap(p => p.handles) : []); }
+
+function renderFrequent() {
+  const t = taken();
+  const f = frequent.filter(x => !t.has(x.handle));
+  $("frequentWrap").hidden = !f.length;
+  $("frequent").innerHTML = "";
+  f.slice(0, 12).forEach(x => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip";
+    b.innerHTML = `${esc(x.name)}<small>${x.count} texts</small>`;
+    b.onclick = () => pick(x.name === x.handle ? "" : x.name, [x.handle]);
+    $("frequent").appendChild(b);
+  });
+}
+
+function pick(name, handles) {
+  $("newName").value = name;
+  $("newHandle").value = handles.join(", ");
+  $("results").innerHTML = ""; $("search").value = "";
+  (name ? $("newEvery") : $("newName")).focus();
+}
+
+$("search").addEventListener("input", e => {
+  const q = e.target.value.trim().toLowerCase();
+  const box = $("results"); box.innerHTML = "";
+  if (!q) return;
+  const hits = contacts.filter(c => c.name.toLowerCase().includes(q) || c.handles.some(h => h.includes(q))).slice(0, 8);
+  if (!hits.length) { box.innerHTML = `<p class="hint">No contacts match. Type their name and number below instead.</p>`; return; }
+  hits.forEach(c => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "result";
+    b.innerHTML = `<span>${esc(c.name)}</span><small>${esc(c.handles.slice(0, 2).join(", "))}</small>`;
+    b.onclick = () => pick(c.name, c.handles);
+    box.appendChild(b);
+  });
+});
+
+$("addBtn").onclick = async () => {
+  const ok = await act("/api/person", {
+    name: $("newName").value, every_days: +$("newEvery").value, nudges: $("newNudges").checked,
+    handles: $("newHandle").value.split(",").map(s => s.trim()).filter(Boolean)
+  });
+  if (ok) { $("newName").value = ""; $("newHandle").value = ""; }
+};
+
+$("saveSettings").onclick = () => act("/api/settings", { settings: {
+  notify_hour: +$("s_notify_hour").value, nudge_after_days: +$("s_nudge_after_days").value,
+  nudge_repeat_days: +$("s_nudge_repeat_days").value, snooze_days: +$("s_snooze_days").value,
+  awake_hours: [+$("s_awake_0").value, +$("s_awake_1").value],
+  count_their_texts: $("s_count_their_texts").checked, mac_banners: $("s_mac_banners").checked
+}});
+$("testBtn").onclick = () => act("/api/test", {});
+
+
+async function load() {
+  try { data = await api("/api/overview"); render(); }
+  catch (e) { $("strip").innerHTML = `<span>${esc(e.message)}</span>`; }
+}
+load();
+api("/api/suggestions").then(j => { contacts = j.contacts; frequent = j.frequent; renderFrequent(); }).catch(() => {});
+setInterval(() => { if (!document.querySelector(".edit:not([hidden])") && !document.activeElement.matches("input, select")) load(); }, 60000);
+</script>
+</body>
+</html>
