@@ -1,57 +1,77 @@
 # Keep in Touch
 
-Banner reminders to text people, based on your actual iMessage history. Your Mac checks Messages every 15 minutes (and when it wakes up), works out who's due, and queues banners on your iPhone through the free ntfy app. Banners still arrive when the laptop is shut.
+Banner reminders to text the people you care about, based on your **real iMessage history**.
 
-## Setup (about 20 minutes)
+Pick your people and how often (Dad every 4 days, a friend every 30). When it's been that long since you texted them, a banner pops up on your iPhone. Text them and it resets on its own. No checking things off.
 
-1. **iPhone:** install **ntfy**, tap **+**, subscribe to a random channel name like `kit-owen-7q4mz9x2` (server: ntfy.sh), and allow notifications.
-2. **Mac:** unzip this folder in Downloads, open Terminal, and run:
+**Website:** https://wadeowen1234.github.io/keep-in-touch/
+
+## What you need
+
+- A **Mac** signed in to iMessage, with **Messages in iCloud** on (Messages → Settings → iMessage → Enable Messages in iCloud), so texts from your phone show up on the Mac.
+- An **iPhone** with the free **[ntfy](https://apps.apple.com/app/ntfy/id1625396347)** app. No account needed.
+
+Free. No sign-ups.
+
+## Install (about 5 minutes)
+
+1. On your Mac, open **Terminal**: press **⌘ Space**, type `Terminal`, press **Return**.
+2. Paste this and press **Return**:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/wadeowen1234/keep-in-touch/main/install.sh | bash
    ```
-   bash ~/Downloads/keep-in-touch/install.sh
-   ```
-   Paste your channel name when it asks. If it says Python isn't installed, run `xcode-select --install`, click Install, and run the installer again.
-3. **Full Disk Access:** System Settings opens to Privacy & Security → Full Disk Access. Click **+**, press **Cmd+Shift+G**, paste each path the installer printed, add it, and switch it on. This lets the app read Messages and Contacts. It only reads. It never sends texts or changes anything.
-4. **Restart the settings page** with the command the installer printed, then open **http://localhost:8787** and bookmark it.
+3. When it asks about a channel, just press **Return**. It makes a private one for you.
+4. Your browser opens **http://localhost:8787**. Follow the three setup steps there:
+   1. **Scan the QR code** with your iPhone camera. It walks you through installing ntfy and subscribing. Then click **Send test banner**.
+   2. **Allow access to Messages** (Full Disk Access). The page shows exactly where to click and checks that it worked.
+   3. **Add your first 3 people.** Tap someone from "People you've texted most" and pick how often.
 
-## The settings page (localhost:8787)
+If it says you need Apple's Command Line Tools, click **Install** in the pop-up, wait for it to finish, and run the command again.
 
-- **Add someone:** tap one of the people you text most, or search your contacts, pick an interval, and add.
-- **Each person:** change their interval, toggle nudges, tap **Talked ✓** after a call or hangout, **Snooze**, or **Edit** to change their name and numbers or remove them.
-- **Settings:** reminder time, nudge timing, snooze length, Mac banners, and whether their texts count.
-- **Send test banner:** confirms your phone is connected.
+**Update:** run the same command again. Your people and settings are kept.
 
-It only runs on your Mac. Your phone can't open it.
+## Using it
 
-## Banner buttons (on your phone)
+- **Settings page:** http://localhost:8787 on your Mac (bookmark it). Change intervals, add or remove people, **Talked ✓** after a call or seeing someone, **Snooze**.
+- **Banners:** tap one to open a text to that person. Long-press for **Texted ✓**, **Snooze 3d**, or **Stop nudging**.
+- **Nudges:** if you still haven't texted 2 days after a reminder, you get a louder nudge, then every 2 days until you do. Turn them off per person.
+- **Laptop closed?** Banners up to 3 days ahead are already queued, so they still arrive. Anything later sends when the Mac wakes up, only during the day, and only the latest one.
 
-Long-press a banner to get:
-- **Texted ✓:** resets their timer, for when you reached them some other way
-- **Snooze 3d:** pushes them back 3 days
-- **Stop nudging:** on nudges only; turns off follow-ups for that person
+## Privacy
 
-Your Mac applies the tap within a minute if the settings page is running, or at its next check. If the Mac is off for more than about 12 hours, a tap can get lost, so just redo it.
-
-## How it decides
-
-- **Reminder:** on the day you hit someone's interval, at your reminder time (11am by default).
-- **Nudge:** 2 days later if you still haven't texted, then every 2 days until you do. Nudges are louder.
-- **You text them** from your phone or your Mac: the next check sees it (Messages in iCloud syncs your phone's texts), cancels pending banners, and restarts the timer.
-- **Mac closed for days:** banners up to 3 days out are already queued. Anything later sends when the Mac wakes, only during waking hours, and only the latest one.
-- Tapping a banner opens a text to that person.
-
-## Terminal commands (optional)
-
-`python3 ~/KeepInTouch/keep_in_touch.py status`, `talked Dad`, `snooze Dad 5`, `nudges-off Sam`, `nudges-on Sam`, `test`
+- Your messages stay on your Mac. It only reads **when** you last texted someone, never what you said, and it never sends anything.
+- Banners go through [ntfy.sh](https://ntfy.sh), a free public notification service. It only sees what's in a banner: a name and a day count.
+- Your channel name is random and works like a password. Don't share it.
 
 ## Troubleshooting
 
-- Log: `~/KeepInTouch/log.txt`
-- Page says "macOS blocked access": Full Disk Access isn't on for one of the Python paths. After fixing it, restart the page (step 4).
-- Someone shows "No texts found": their number or email doesn't match Messages. Click Edit and fix it.
-- Turn everything off:
-  ```
-  launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.keepintouch.agent.plist
-  launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.keepintouch.settings.plist
-  ```
+- **No banner on your phone:** in ntfy, check you're subscribed to the exact channel name shown on the settings page (capitals matter), and that notifications for ntfy are allowed in iPhone Settings.
+- **"Can't read Messages yet":** the Full Disk Access step isn't done. Open the settings page and follow step 2, then click **Check again**.
+- **Someone shows "No texts found":** their number or email doesn't match what's in Messages. Click **Edit** and fix it.
+- **Log file:** `~/KeepInTouch/log.txt`
 
-**Privacy:** ntfy.sh is a public server. Your random channel name works like a password, so don't share it. Banners contain only names and day counts.
+## Uninstall
+
+```bash
+bash ~/KeepInTouch/uninstall.sh
+```
+
+It stops everything, cancels queued banners, and asks before deleting your people and settings.
+
+## For tinkerers
+
+Everything is one Python file (`keep_in_touch.py`, standard library only, Python 3.8+) plus the settings page (`settings.html`). It runs as two LaunchAgents: `run` every 15 minutes and on wake, and `serve` for the settings page.
+
+Terminal commands: `python3 ~/KeepInTouch/keep_in_touch.py status | test | check | talked NAME | snooze NAME [days] | nudges-off NAME | nudges-on NAME`
+
+Test without touching real data:
+
+```bash
+python3 dev/make_fake_data.py /tmp/kittest
+export KIT_CHAT_DB=/tmp/kittest/chat.db KIT_CONTACTS_DIR=/tmp/kittest/ab KIT_DRY_RUN=1 KIT_NOW=2026-11-20T10:30
+echo '{"ntfy_topic":"test","people":[]}' > config.json
+python3 keep_in_touch.py status
+KIT_PORT=8799 python3 keep_in_touch.py serve
+```
+
+To install from a fork: `KIT_REPO=you/keep-in-touch` before `bash` in the install command, and change `SITE_URL` in `keep_in_touch.py`.

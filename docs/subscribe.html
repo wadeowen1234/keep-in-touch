@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Get banners on your iPhone</title>
+<style>
+/* Opened on the phone from the QR code on the Mac's settings page.
+   The channel name is in the URL after the #, so it is never sent to any server. */
+:root {
+  --bg: #eef2f1; --surface: #ffffff; --ink: #15211f; --muted: #5b6b68; --line: #d6dfdd;
+  --accent: #0f7b6c; --accent-ink: #ffffff; --accent-soft: #dcefeb;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1615; --surface: #18221f; --ink: #e6efec; --muted: #93a6a1; --line: #2a3734;
+    --accent: #3fbfa8; --accent-ink: #062621; --accent-soft: #173a34;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 17px/1.5 -apple-system, system-ui, sans-serif; }
+.wrap { max-width: 480px; margin: 0 auto; padding: 28px 16px 48px; display: grid; gap: 16px; }
+h1 { font-size: 28px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+p { margin: 0; }
+.sub { color: var(--muted); }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid; gap: 12px; }
+.step h2 { font-size: 18px; margin: 0; display: flex; gap: 10px; align-items: center; }
+.n { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 15px; flex: none; }
+.btn { display: block; text-align: center; font: 600 17px -apple-system, system-ui, sans-serif; padding: 14px; border-radius: 12px; border: none; background: var(--accent); color: var(--accent-ink); text-decoration: none; width: 100%; cursor: pointer; }
+.topic { font: 600 20px ui-monospace, Menlo, monospace; text-align: center; background: var(--bg); border: 1px dashed var(--line); border-radius: 12px; padding: 14px; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+.hint { color: var(--muted); font-size: 15px; }
+.missing { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Get Keep in Touch banners on your iPhone</h1>
+  <p class="sub">Three quick steps. You only do this once.</p>
+
+  <div id="missing" class="missing" hidden>
+    <p>This page needs your channel name. Open <b>localhost:8787</b> on your Mac and scan the QR code there with your iPhone camera.</p>
+  </div>
+
+  <div id="steps">
+    <div class="step">
+      <h2><span class="n">1</span>Get the free ntfy app</h2>
+      <a class="btn" href="https://apps.apple.com/app/ntfy/id1625396347">Open the App Store</a>
+      <p class="hint">Tap <b>Get</b>. Already have it? Skip to step 2.</p>
+    </div>
+    <div class="step" style="margin-top:16px">
+      <h2><span class="n">2</span>Copy your channel name</h2>
+      <div class="topic" id="topic"></div>
+      <button class="btn" type="button" id="copy">Copy</button>
+      <p class="hint">It's private. Anyone with it could see your banners, so don't share it.</p>
+    </div>
+    <div class="step" style="margin-top:16px">
+      <h2><span class="n">3</span>Subscribe in ntfy</h2>
+      <ol>
+        <li>Open <b>ntfy</b>.</li>
+        <li>Tap <b>+</b> in the top-right corner.</li>
+        <li>Tap the <b>Topic name</b> box, then tap it again and choose <b>Paste</b>.</li>
+        <li>Leave <b>Use another server</b> off. Tap <b>Subscribe</b>.</li>
+        <li>When it asks about notifications, tap <b>Allow</b>.</li>
+      </ol>
+      <p class="hint">Then go back to your Mac and click <b>Send test banner</b>. A banner should pop up here within a few seconds.</p>
+    </div>
+  </div>
+</main>
+<script>
+const topic = decodeURIComponent(location.hash.slice(1)).trim();
+const valid = /^[A-Za-z0-9_-]{1,64}$/.test(topic);
+document.getElementById("missing").hidden = valid;
+document.getElementById("steps").hidden = !valid;
+if (valid) {
+  document.getElementById("topic").textContent = topic;
+  document.getElementById("copy").onclick = async e => {
+    try { await navigator.clipboard.writeText(topic); e.target.textContent = "Copied ✓"; }
+    catch (err) {
+      const r = document.createRange(); r.selectNodeContents(document.getElementById("topic"));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      e.target.textContent = "Selected. Tap Copy in the menu.";
+    }
+  };
+}
+</script>
+</body>
+</html>

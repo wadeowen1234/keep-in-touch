@@ -16,6 +16,8 @@ Commands:
   python3 keep_in_touch.py snooze Dad 3 push someone's reminders back 3 days
   python3 keep_in_touch.py nudges-off Sam   stop follow-up nudges for someone (reminders still come)
   python3 keep_in_touch.py nudges-on Sam    turn follow-up nudges back on
+  python3 keep_in_touch.py cancel-all       cancel every banner already queued on your phone (used by uninstall)
+  python3 keep_in_touch.py check            check that macOS lets this read Messages (Full Disk Access)
 """
 import datetime as dt
 import fcntl
@@ -42,6 +44,9 @@ CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 STATE_PATH = os.path.join(APP_DIR, "state.json")
 LOCK_PATH = os.path.join(APP_DIR, ".lock")
 PAGE_PATH = os.path.join(APP_DIR, "settings.html")
+QR_PATH = os.path.join(APP_DIR, "qr.js")
+SITE_URL = "https://wadeowen1234.github.io/keep-in-touch"
+FDA_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
 CHAT_DB = os.environ.get("KIT_CHAT_DB", os.path.expanduser("~/Library/Messages/chat.db"))
 CONTACTS_DIR = os.environ.get("KIT_CONTACTS_DIR", os.path.expanduser("~/Library/Application Support/AddressBook"))
 DRY_RUN = os.environ.get("KIT_DRY_RUN") == "1"
@@ -66,6 +71,14 @@ DEFAULTS = {
 
 class KitError(Exception):
     pass
+
+
+class AccessError(KitError):
+    """macOS is blocking Messages because Python doesn't have Full Disk Access."""
+
+
+BLOCKED_MSG = ("macOS is blocking access to Messages. Open http://localhost:8787 and follow "
+               "the Full Disk Access steps.")
 
 
 # ---------- small helpers ----------
@@ -159,17 +172,45 @@ def copy_db(path, tmp, name):
             if os.path.exists(path + suffix):
                 shutil.copy2(path + suffix, os.path.join(tmp, name + suffix))
     except PermissionError:
-        raise KitError("macOS blocked access. Give Full Disk Access to Python "
-                       "(and Terminal, if you're running this by hand). See the README, step 4.")
+        raise AccessError(BLOCKED_MSG)
     return sqlite3.connect(os.path.join(tmp, name))
+
+
+def messages_access():
+    """'ok', 'blocked' (no Full Disk Access), or 'missing' (Messages isn't set up on this Mac)."""
+    try:
+        with open(CHAT_DB, "rb") as f:
+            f.read(16)
+        return "ok"
+    except PermissionError:
+        return "blocked"
+    except FileNotFoundError:
+        # Without Full Disk Access, macOS can make the whole folder unreadable.
+        try:
+            os.listdir(os.path.dirname(CHAT_DB))
+        except PermissionError:
+            return "blocked"
+        except OSError:
+            pass
+        return "missing"
+
+
+def fda_paths():
+    """The Python files to add under Full Disk Access (the launcher and the real binary)."""
+    real = os.path.realpath(sys.executable)
+    return ["/usr/bin/python3"] + ([real] if real != "/usr/bin/python3" else [])
 
 
 # ---------- reading Messages and Contacts ----------
 
 def read_messages(include_theirs):
     """Return {normalized handle: (unix time of last message, messages in last 90 days)}."""
-    if not os.path.exists(CHAT_DB):
-        raise KitError("Can't find the Messages database at {}. Is Messages set up on this Mac?".format(CHAT_DB))
+    access = messages_access()
+    if access == "blocked":
+        raise AccessError(BLOCKED_MSG)
+    if access == "missing":
+        raise KitError("Can't find the Messages database at {}. Is Messages set up and signed in "
+                       "on this Mac?".format(CHAT_DB))
     tmp = tempfile.mkdtemp()
     try:
         con = copy_db(CHAT_DB, tmp, "chat.db")
@@ -512,11 +553,17 @@ def run(cfg, state):
 def overview(cfg, state):
     """Everything the settings page and `status` show."""
     now = now_ts()
-    msgs = read_messages(cfg.get("count_their_texts", False))
+    access, access_error = "ok", None
+    try:
+        msgs = read_messages(cfg.get("count_their_texts", False))
+    except AccessError as e:
+        msgs, access, access_error = None, "blocked", str(e)
+    except KitError as e:
+        msgs, access, access_error = None, "missing", str(e)
     today = local_day(now)
     rows = []
     for p in cfg["people"]:
-        last = last_texted(p, msgs, state)
+        last = last_texted(p, msgs, state) if msgs is not None else None
         _, due, _ = events_for(p, last, cfg, state, now)
         rows.append({
             "name": p["name"],
@@ -524,7 +571,7 @@ def overview(cfg, state):
             "every_days": p["every_days"],
             "nudges": p.get("nudges", True),
             "last_days_ago": (today - local_day(last)).days if last else None,
-            "due_in": (due - today).days,
+            "due_in": (due - today).days if msgs is not None else None,
             "snoozed_until": local_day(state["snooze"][p["name"]]).isoformat()
             if state.get("snooze", {}).get(p["name"], 0) > now else None,
         })
@@ -535,11 +582,19 @@ def overview(cfg, state):
         "settings": {k: cfg[k] for k in DEFAULTS if k != "people"},
         "topic": cfg["ntfy_topic"],
         "now": now,
+        "access": access,
+        "access_error": access_error,
+        "fda_paths": fda_paths(),
+        "setup": cfg.get("setup", {}),
+        "subscribe_url": "{}/subscribe.html#{}".format(SITE_URL, cfg["ntfy_topic"]),
+        "ntfy_server": cfg.get("ntfy_server", "https://ntfy.sh"),
     }
 
 
 def print_status(cfg, state):
     o = overview(cfg, state)
+    if o["access"] != "ok":
+        print("\n" + o["access_error"])
     print("\n{:<22}{:<8}{:<22}{:<18}{}".format("Name", "Every", "Last texted", "Due", "Nudges"))
     print("-" * 78)
     for r in o["people"]:
@@ -547,14 +602,14 @@ def print_status(cfg, state):
         last_txt = "not found (check #)" if ago is None else (
             "today" if ago == 0 else "{} day{} ago".format(ago, "" if ago == 1 else "s"))
         left = r["due_in"]
-        due_txt = "today" if left == 0 else ("in {}d".format(left) if left > 0 else "{}d overdue".format(-left))
+        due_txt = "?" if left is None else "today" if left == 0 else ("in {}d".format(left) if left > 0 else "{}d overdue".format(-left))
         if r["snoozed_until"]:
             due_txt = "snoozed"
         print("{:<22}{:<8}{:<22}{:<18}{}".format(
             r["name"][:21], "{}d".format(r["every_days"]), last_txt, due_txt, "on" if r["nudges"] else "off"))
     print("\n{} banner{} queued on your phone.".format(o["queued"], "" if o["queued"] == 1 else "s"))
     missing = [r["name"] for r in o["people"] if r["last_days_ago"] is None]
-    if missing:
+    if missing and o["access"] == "ok":
         print("No messages found for: {}. Check their numbers in the settings page.".format(", ".join(missing)))
     print()
 
@@ -562,7 +617,10 @@ def print_status(cfg, state):
 # ---------- settings page ----------
 
 def suggestions(cfg):
-    msgs = read_messages(True)
+    try:
+        msgs = read_messages(True)
+    except KitError:
+        msgs = {}
     contacts = read_contacts()
     name_for = {}
     for c in contacts:
@@ -611,6 +669,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/":
                 with open(PAGE_PATH, "rb") as f:
                     return self.reply(200, f.read(), "text/html")
+            if path == "/qr.js":
+                with open(QR_PATH, "rb") as f:
+                    return self.reply(200, f.read(), "text/javascript")
             with locked():
                 cfg, state = load_config(), load_json(STATE_PATH, {})
                 if path == "/api/overview":
@@ -671,16 +732,51 @@ class Handler(BaseHTTPRequestHandler):
                             3, ["tada"], None, None, now_ts())
                     mac_banner(cfg, "👋 Keep in Touch is connected", "Mac banners work too.")
                     return self.reply(200, {"message": "Test banner sent. Check your phone."})
+                elif path == "/api/open-fda":
+                    subprocess.run(["open", FDA_SETTINGS_URL], check=False)
+                    return self.reply(200, {"message": "Opened System Settings."})
+                elif path == "/api/check-access":
+                    if messages_access() != "ok" and self.fresh_process_can_read():
+                        # Access was just granted, but this running copy still can't see it. Restart it.
+                        if os.getppid() == 1:
+                            threading.Timer(1.0, lambda: os._exit(0)).start()
+                            return self.reply(200, {"message": "Access works. Restarting the page…",
+                                                    "restarting": True})
+                        msg = "Access works. Restart the settings page to pick it up."
+                    elif messages_access() == "ok":
+                        msg = "Messages access works."
+                    else:
+                        msg = "Still blocked. Double-check both Python entries are switched on."
+                elif path == "/api/setup":
+                    setup = cfg.setdefault("setup", {})
+                    for k in ("phone_ok", "dismissed"):
+                        if k in data:
+                            setup[k] = bool(data[k])
+                    save_json(CONFIG_PATH, cfg)
+                    msg = "Saved."
                 else:
                     return self.reply(404, {"error": "Not found"})
                 cfg = load_config()
-                run(cfg, state)
+                try:
+                    run(cfg, state)
+                except AccessError:
+                    pass  # the page shows the Full Disk Access steps
                 save_json(STATE_PATH, state)
                 return self.reply(200, {"message": msg, "overview": overview(cfg, state)})
         except KitError as e:
             self.reply(400, {"error": str(e)})
         except (urllib.error.URLError, OSError) as e:
             self.reply(502, {"error": "Saved, but couldn't reach ntfy: {}".format(e)})
+
+
+    @staticmethod
+    def fresh_process_can_read():
+        try:
+            r = subprocess.run([sys.executable, os.path.abspath(__file__), "check"],
+                               capture_output=True, timeout=20)
+            return r.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
 
 
 def button_watcher():
@@ -714,12 +810,32 @@ def main():
     try:
         if cmd == "serve":
             return serve()
+        if cmd == "check":
+            access = messages_access()
+            print({"ok": "Messages access works.", "blocked": BLOCKED_MSG,
+                   "missing": "Can't find Messages on this Mac."}[access])
+            sys.exit(0 if access == "ok" else 1)
         with locked():
             cfg = load_config()
             state = load_json(STATE_PATH, {})
             if cmd == "run":
-                run(cfg, state)
+                try:
+                    run(cfg, state)
+                except AccessError:
+                    # Tell them on the Mac, at most once a day, instead of failing silently.
+                    if now_ts() - state.get("access_nag", 0) > 86400:
+                        mac_banner(cfg, "Keep in Touch needs access",
+                                   "Open localhost:8787 to finish setup (Full Disk Access).")
+                        state["access_nag"] = now_ts()
+                    save_json(STATE_PATH, state)
+                    raise
                 save_json(STATE_PATH, state)
+            elif cmd == "cancel-all":
+                for key, info in list(state.get("scheduled", {}).items()):
+                    cancel(cfg, info["id"])
+                    del state["scheduled"][key]
+                save_json(STATE_PATH, state)
+                print("Cancelled all queued banners.")
             elif cmd == "status":
                 print_status(cfg, state)
             elif cmd == "test":
