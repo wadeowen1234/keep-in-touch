@@ -48,6 +48,9 @@ h2 { font-size: 18px; }
 .pill.late { background: var(--late-bg); color: var(--late); } .pill.muted { background: var(--bg); color: var(--muted); }
 .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .controls .spacer { flex: 1; }
+.controls { gap: 6px; }
+.controls button { padding: 7px 10px; }
+.controls button.ghost { padding: 7px 6px; }
 input.days { width: 76px; text-align: center; font-variant-numeric: tabular-nums; }
 .inline-text { font-size: 14px; color: var(--muted); }
 label.inline { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
@@ -261,6 +264,7 @@ function render() {
         <label class="inline"><input type="checkbox" data-k="nudges" ${p.nudges ? "checked" : ""}> Nudges</label>
         <span class="spacer"></span>
         <button type="button" data-k="talked" title="Use this for calls or seeing them in person">Talked ✓</button>
+        <button type="button" data-k="snapped" title="Use this after you snap them. Snapchat can't be read automatically.">Snapped ✓</button>
         <button type="button" data-k="snooze">Snooze ${data.settings.snooze_days}d</button>
         <button type="button" class="ghost" data-k="edit" aria-expanded="false">Edit</button>
       </div>
@@ -280,6 +284,7 @@ function render() {
     c.querySelector('[data-k="every"]').onchange = e => { const v = Math.round(+e.target.value); if (v >= 1 && v <= 365) act("/api/person", person({ every_days: v })); else { toast("Pick a number from 1 to 365.", true); e.target.value = p.every_days; } };
     c.querySelector('[data-k="nudges"]').onchange = e => act("/api/action", { cmd: e.target.checked ? "nudges-on" : "nudges-off", name: p.name });
     c.querySelector('[data-k="talked"]').onclick = () => act("/api/action", { cmd: "talked", name: p.name });
+    c.querySelector('[data-k="snapped"]').onclick = () => act("/api/action", { cmd: "talked", name: p.name });
     c.querySelector('[data-k="snooze"]').onclick = () => act("/api/action", { cmd: "snooze", name: p.name });
     const editBtn = c.querySelector('[data-k="edit"]'), edit = c.querySelector(".edit");
     editBtn.onclick = () => { edit.hidden = !edit.hidden; editBtn.setAttribute("aria-expanded", String(!edit.hidden)); };

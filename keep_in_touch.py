@@ -348,8 +348,9 @@ def publish(cfg, title, body, priority, tags, click, when, now, actions=None):
         "title": title,
         "message": body,
         "priority": priority,
-        "tags": tags,
     }
+    if tags:
+        payload["tags"] = tags
     if click:
         payload["click"] = click
     if actions:
@@ -481,7 +482,9 @@ def awake(cfg, now):
 def send(cfg, e, when, now):
     title, body = wording(e["key"], e["kind"], e["name"], e["days"])
     priority = 4 if e["kind"] == "nudge" else 3
-    tags = ["rotating_light"] if e["kind"] == "nudge" else ["iphone"]
+    # No ntfy tags: the iPhone app turns tags into an extra emoji in front of the title,
+    # and every title already starts with one.
+    tags = []
     click = "sms:" + norm(e["handle"]) if e["handle"] else None
     msg_id = publish(cfg, title, body, priority, tags, click, when, now, buttons(cfg, e["kind"], e["name"]))
     return msg_id, title, body
@@ -729,7 +732,7 @@ class Handler(BaseHTTPRequestHandler):
                     save_json(CONFIG_PATH, cfg)
                 elif path == "/api/test":
                     publish(cfg, "👋 Keep in Touch is connected", "Banners will show up like this.",
-                            3, ["tada"], None, None, now_ts())
+                            3, [], None, None, now_ts())
                     mac_banner(cfg, "👋 Keep in Touch is connected", "Mac banners work too.")
                     return self.reply(200, {"message": "Test banner sent. Check your phone."})
                 elif path == "/api/open-fda":
@@ -840,7 +843,7 @@ def main():
                 print_status(cfg, state)
             elif cmd == "test":
                 publish(cfg, "👋 Keep in Touch is connected", "Banners will show up like this.",
-                        3, ["tada"], None, None, now_ts())
+                        3, [], None, None, now_ts())
                 mac_banner(cfg, "👋 Keep in Touch is connected", "Mac banners work too.")
                 print("Sent. Check your phone and your Mac.")
             elif cmd in ("talked", "snooze", "nudges-off", "nudges-on") and len(args) > 1:
